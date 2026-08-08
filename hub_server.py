@@ -87,6 +87,21 @@ def root():
 DOUBAO_HOST = "https://open.feedcoopapi.com/search_api/web_search"
 
 
+def bound_doubao_result(data: dict) -> dict:
+    """轻量有界化：删 Content（实测与 Summary 逐字相同，纯体积）。
+    Summary 保持完整不截断；其余字段原样保留。"""
+    if not isinstance(data, dict):
+        return data
+    res = data.get("Result")
+    if isinstance(res, dict):
+        wrs = res.get("WebResults")
+        if isinstance(wrs, list):
+            for w in wrs:
+                if isinstance(w, dict):
+                    w.pop("Content", None)   # == Summary，去掉纯重复
+    return data
+
+
 async def doubao_web_search(query: str, count: int) -> dict:
     if not ARK_KEY:
         raise HTTPException(500, "服务端未配置 ASK_ECHO_SEARCH_INFINITY_API_KEY")
@@ -114,7 +129,7 @@ async def doubao_list_tools() -> list[types.Tool]:
     return [
         types.Tool(
             name="web_search",
-            description="豆包/火山引擎联网搜索（网页搜索）。返回 Result.WebResults[]，每条含 Title/Snippet/Summary/Url/PublishTime/AuthInfoDes。",
+            description="豆包/火山引擎联网搜索（网页搜索）。返回 Result.WebResults[]，每条含 Title/Snippet/Summary/Url/PublishTime/AuthInfoDes。Content 与 Summary 相同已省略；需要全文时用 Url 自行抓取。",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -137,7 +152,7 @@ async def doubao_call_tool(name: str, arguments: dict) -> list[types.TextContent
     if not q:
         raise ValueError("Query 不能为空")
     count = min(max(int(args.get("Count", 10)), 1), 50)
-    data = await doubao_web_search(q, count)
+    data = bound_doubao_result(await doubao_web_search(q, count))
     return [types.TextContent(type="text", text=json.dumps(data, ensure_ascii=False))]
 
 
