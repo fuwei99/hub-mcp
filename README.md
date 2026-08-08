@@ -17,8 +17,8 @@ license: mit
 
 | MCP | SSE 端点 | 工具 |
 |---|---|---|
-| 豆包搜索 | `https://fluidgender159-pioneer.hf.space/doubao/sse` | `web_search` |
-| 知乎 | `https://fluidgender159-pioneer.hf.space/zhihu/sse` | `zhihu_search` / `global_search` / `zhihu_ask` / `zhihu_trending` |
+| 豆包搜索 | `https://fluidgender159-hub-mcp.hf.space/doubao/sse` | `web_search` |
+| 知乎 | `https://fluidgender159-hub-mcp.hf.space/zhihu/sse` | `zhihu_search` / `global_search` / `zhihu_ask` / `zhihu_trending` |
 
 ## 鉴权
 
