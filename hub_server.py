@@ -5,10 +5,12 @@ MCP Hub — 一个 HF Space 挂多个 MCP Server
 路径路由（每个 MCP 独立 SSE 端点 + 独立鉴权 key）:
     /doubao/sse          → 豆包联网搜索 (web_search)
     /zhihu/sse           → 知乎 MCP (zhihu_search / global_search / zhihu_ask / zhihu_trending)
+    /ddg/sse             → DuckDuckGo (search / scrape)，无需任何上游 key
 
 鉴权（Bearer token，SSE 握手与消息 POST 都验）:
     DOUBAO_KEY   env 可覆盖，默认 wei123..
     ZHIHU_KEY    env 可覆盖，默认 wei123..
+    DDG_KEY      env 可覆盖，默认 wei123..
 
 上游密钥（放 HF Space Settings → Secrets，勿写进仓库）:
     ASK_ECHO_SEARCH_INFINITY_API_KEY   火山方舟豆包搜索 API key
@@ -29,11 +31,14 @@ from mcp.server.sse import SseServerTransport
 from mcp import types
 from starlette.routing import Route, Mount
 
+import ddg
+
 # ---------------------------------------------------------------------------
 # 配置
 # ---------------------------------------------------------------------------
 DOUBAO_KEY = os.environ.get("DOUBAO_KEY", "wei123..").strip()
 ZHIHU_KEY = os.environ.get("ZHIHU_KEY", "wei123..").strip()
+DDG_KEY = os.environ.get("DDG_KEY", "wei123..").strip()
 ARK_KEY = os.environ.get("ASK_ECHO_SEARCH_INFINITY_API_KEY", "").strip()
 ZHIHU_SECRET = os.environ.get("ZHIHU_ACCESS_SECRET", "").strip()
 
@@ -57,6 +62,8 @@ async def auth_middleware(request: Request, call_next):
             check_key(request.headers.get("authorization"), DOUBAO_KEY)
         elif path.startswith("/zhihu"):
             check_key(request.headers.get("authorization"), ZHIHU_KEY)
+        elif path.startswith("/ddg"):
+            check_key(request.headers.get("authorization"), DDG_KEY)
     except HTTPException as e:
         return JSONResponse({"error": e.detail}, status_code=e.status_code)
     return await call_next(request)
@@ -69,10 +76,12 @@ def root():
         "endpoints": {
             "doubao": "/doubao/sse  (web_search)",
             "zhihu": "/zhihu/sse  (zhihu_search / global_search / zhihu_ask / zhihu_trending)",
+            "ddg": "/ddg/sse  (search / scrape)",
         },
         "auth": {
             "doubao": "Bearer <DOUBAO_KEY>" if DOUBAO_KEY else "未配置",
             "zhihu": "Bearer <ZHIHU_KEY>" if ZHIHU_KEY else "未配置",
+            "ddg": "Bearer <DDG_KEY>" if DDG_KEY else "未配置",
         },
         "upstream_configured": {
             "ark": bool(ARK_KEY),
@@ -271,10 +280,77 @@ async def zhihu_call_tool(name: str, arguments: dict) -> list[types.TextContent]
 
 
 # ---------------------------------------------------------------------------
+# ddg: DuckDuckGo 抓取（无上游 key，逻辑移植自 rikkahub DuckDuckGoSearchService.kt）
+# ---------------------------------------------------------------------------
+ddg_server = Server("ddg-search")
+
+
+@ddg_server.list_tools()
+async def ddg_list_tools() -> list[types.Tool]:
+    return [
+        types.Tool(
+            name="search",
+            description=(
+                "DuckDuckGo 网页搜索（无需 API key）。返回 items[]，每条含 title / url / text(摘要)。"
+                "摘要不够用时把 url 丢给 scrape 取正文。DDG 有反爬限流，请勿高频连打。"
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "搜索关键词，需短于 500 字符"},
+                    "count": {"type": "integer", "description": "返回条数，1~30，默认 10", "default": 10},
+                    "region": {"type": "string", "description": "地区代码：auto(默认) / wt-wt(全球) / cn-zh / us-en 等", "default": "auto"},
+                    "time_range": {"type": "string", "description": "时间范围：all(默认) / d(天) / w(周) / m(月) / y(年)", "default": "all"},
+                    "safe_search": {"type": "string", "description": "off / moderate(默认) / strict", "default": "moderate"},
+                },
+                "required": ["query"],
+            },
+        ),
+        types.Tool(
+            name="scrape",
+            description="抓取任意网页正文（剔除 script/style/nav/footer 等噪音后返回纯文本 + title/description/language）。",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string", "description": "要抓取的网址"},
+                    "max_length": {"type": "integer", "description": "正文长度上限，500~40000，默认 8000", "default": 8000},
+                },
+                "required": ["url"],
+            },
+        ),
+    ]
+
+
+@ddg_server.call_tool()
+async def ddg_call_tool(name: str, arguments: dict) -> list[types.TextContent]:
+    args = arguments or {}
+    try:
+        if name == "search":
+            data = await ddg.search(
+                query=str(args.get("query", "")),
+                count=int(args.get("count", 10)),
+                region=str(args.get("region", "auto")),
+                time_range=str(args.get("time_range", "all")),
+                safe_search=str(args.get("safe_search", "moderate")),
+            )
+        elif name == "scrape":
+            data = await ddg.scrape(
+                url=str(args.get("url", "")),
+                max_length=int(args.get("max_length", ddg.MAX_SCRAPE_LENGTH)),
+            )
+        else:
+            raise ValueError(f"未知工具: {name}")
+    except ddg.DDGError as e:
+        raise ValueError(str(e))
+    return [types.TextContent(type="text", text=json.dumps(data, ensure_ascii=False, indent=2))]
+
+
+# ---------------------------------------------------------------------------
 # SSE 路由
 # ---------------------------------------------------------------------------
 doubao_sse = SseServerTransport("/doubao/messages/")
 zhihu_sse = SseServerTransport("/zhihu/messages/")
+ddg_sse = SseServerTransport("/ddg/messages/")
 
 
 async def handle_doubao_sse(request: Request):
@@ -291,10 +367,19 @@ async def handle_zhihu_sse(request: Request):
         await zhihu_server.run(*streams, zhihu_server.create_initialization_options())
 
 
+async def handle_ddg_sse(request: Request):
+    async with ddg_sse.connect_sse(
+        request.scope, request.receive, request._send
+    ) as streams:
+        await ddg_server.run(*streams, ddg_server.create_initialization_options())
+
+
 app.router.routes.append(Route("/doubao/sse", endpoint=handle_doubao_sse))
 app.router.routes.append(Mount("/doubao/messages/", app=doubao_sse.handle_post_message))
 app.router.routes.append(Route("/zhihu/sse", endpoint=handle_zhihu_sse))
 app.router.routes.append(Mount("/zhihu/messages/", app=zhihu_sse.handle_post_message))
+app.router.routes.append(Route("/ddg/sse", endpoint=handle_ddg_sse))
+app.router.routes.append(Mount("/ddg/messages/", app=ddg_sse.handle_post_message))
 
 
 if __name__ == "__main__":

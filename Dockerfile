@@ -7,7 +7,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY hub_server.py .
+COPY hub_server.py ddg.py ./
 
 EXPOSE 7860
 

@@ -3,3 +3,6 @@ uvicorn[standard]==0.34.0
 httpx==0.28.1
 mcp==1.2.0
 pydantic==2.10.4
+curl_cffi==0.16.0
+beautifulsoup4==4.15.0
+lxml>=5.3,<7
