@@ -21,6 +21,16 @@ license: mit
 | 知乎 | `https://fluidgender159-hub-mcp.hf.space/zhihu/sse` | `zhihu_search` / `global_search` / `zhihu_ask` / `zhihu_trending` |
 | DuckDuckGo | `https://fluidgender159-hub-mcp.hf.space/ddg/sse` | `search` / `scrape` |
 
+### REST 端点（给 rikkahub 安卓端，非 MCP）
+
+| 方法 | 路径 | body | 返回 |
+|---|---|---|---|
+| POST | `/ddg/search` | `{query, count?, region?, time_range?, safe_search?}` | `{items:[{title,url,text}], images:[]}` |
+| POST | `/ddg/scrape` | `{url, max_length?}` | `{urls:[{url,content,metadata:{...}}]}` |
+
+返回体与 rikkahub 的 `SearchResult` / `ScrapedResult` 完全同构，客户端直接反序列化即可。
+鉴权同为 `Authorization: Bearer <DDG_KEY>`，出错返回 `{"detail": "..."}`。
+
 ## 鉴权
 
 每个 MCP 独立 Bearer key（`Authorization: Bearer <key>`）：

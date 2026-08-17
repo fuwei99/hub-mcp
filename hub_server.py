@@ -7,6 +7,11 @@ MCP Hub — 一个 HF Space 挂多个 MCP Server
     /zhihu/sse           → 知乎 MCP (zhihu_search / global_search / zhihu_ask / zhihu_trending)
     /ddg/sse             → DuckDuckGo (search / scrape)，无需任何上游 key
 
+另外给 rikkahub 安卓端准备的普通 REST 端点（不走 MCP 那套 JSON-RPC/SSE 握手）:
+    POST /ddg/search     → {answer?, items:[{title,url,text}], images:[]}
+    POST /ddg/scrape     → {urls:[{url,content,metadata:{title,description,language}}]}
+    返回体字段与 rikkahub SearchResult / ScrapedResult 完全同构，客户端可直接反序列化。
+
 鉴权（Bearer token，SSE 握手与消息 POST 都验）:
     DOUBAO_KEY   env 可覆盖，默认 wei123..
     ZHIHU_KEY    env 可覆盖，默认 wei123..
@@ -348,6 +353,44 @@ async def ddg_call_tool(name: str, arguments: dict) -> list[types.TextContent]:
 # ---------------------------------------------------------------------------
 # SSE 路由
 # ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# ddg REST：给 rikkahub 安卓端用，返回体与 SearchResult / ScrapedResult 同构
+# ---------------------------------------------------------------------------
+@app.post("/ddg/search")
+async def ddg_rest_search(request: Request):
+    body = await request.json() if await request.body() else {}
+    if not isinstance(body, dict):
+        raise HTTPException(400, "body 必须是 JSON 对象")
+    try:
+        data = await ddg.search(
+            query=str(body.get("query", "")),
+            count=int(body.get("count", 10)),
+            region=str(body.get("region", "auto")),
+            time_range=str(body.get("time_range", "all")),
+            safe_search=str(body.get("safe_search", "moderate")),
+        )
+    except ddg.DDGError as e:
+        raise HTTPException(502, str(e))
+    return {"items": data["items"], "images": data.get("images", [])}
+
+
+@app.post("/ddg/scrape")
+async def ddg_rest_scrape(request: Request):
+    body = await request.json() if await request.body() else {}
+    if not isinstance(body, dict):
+        raise HTTPException(400, "body 必须是 JSON 对象")
+    try:
+        data = await ddg.scrape(
+            url=str(body.get("url", "")),
+            max_length=int(body.get("max_length", ddg.MAX_SCRAPE_LENGTH)),
+        )
+    except ddg.DDGError as e:
+        raise HTTPException(502, str(e))
+    return {"urls": data["urls"]}
+
+
 doubao_sse = SseServerTransport("/doubao/messages/")
 zhihu_sse = SseServerTransport("/zhihu/messages/")
 ddg_sse = SseServerTransport("/ddg/messages/")
