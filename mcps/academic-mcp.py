@@ -1,10 +1,8 @@
-"""学术论文 MCP（academic-mcp 子进程桥）：paper_search / paper_download / paper_read（19+ 学术源，免 key）"""
-import asyncio
-import os
-from pathlib import Path
-
+"""学术论文 MCP（academic-mcp 子进程桥）：paper_search / paper_download / paper_read（18 学术源，免 key）"""
 from mcp import types
 from mcp.server import Server
+
+from _stdio_bridge import StdioBridge
 
 MOUNT = "academic"
 KEY_ENV = "ACADEMIC_KEY"
@@ -12,93 +10,25 @@ DEFAULT_KEY = "wei123.."
 
 server = Server("academic-bridge")
 
-_state = {"session": None, "session_cm": None, "tools": None, "cm": None, "lock": None}
 
+def _params():
+    import os
 
-def _get_lock():
-    if _state["lock"] is None:
-        _state["lock"] = asyncio.Lock()
-    return _state["lock"]
-
-
-async def _spawn():
-    from mcp import ClientSession
-    from mcp.client.stdio import StdioServerParameters, stdio_client
+    from mcp.client.stdio import StdioServerParameters
 
     cmd = os.environ.get("ACADEMIC_MCP_CMD", "/opt/academic-venv/bin/academic-mcp")
-    params = StdioServerParameters(command=cmd, args=[])
-    cm = stdio_client(params)
-    read, write = await cm.__aenter__()
-    session_cm = ClientSession(read, write)
-    session = await session_cm.__aenter__()
-    await asyncio.wait_for(session.initialize(), timeout=60)
-    _state["session_cm"] = session_cm
-    _state["cm"] = cm
-    _state["session"] = session
-    return session
+    return StdioServerParameters(command=cmd, args=[])
 
 
-async def _get_session():
-    lock = _get_lock()
-    async with lock:
-        if _state["session"] is None:
-            await _spawn()
-        return _state["session"]
-
-
-async def _reset():
-    lock = _get_lock()
-    async with lock:
-        scm = _state["session_cm"]
-        cm = _state["cm"]
-        _state["session"] = None
-        _state["session_cm"] = None
-        _state["tools"] = None
-        _state["cm"] = None
-        if scm is not None:
-            try:
-                await scm.__aexit__(None, None, None)
-            except Exception:
-                pass
-        if cm is not None:
-            try:
-                await cm.__aexit__(None, None, None)
-            except Exception:
-                pass
-
-
-async def _get_tools():
-    if _state["tools"] is None:
-        s = await _get_session()
-        res = await s.list_tools()
-        _state["tools"] = res.tools
-    return _state["tools"]
+# 学术源多、初始化慢，超时给宽些
+bridge = StdioBridge(_params, timeout=150.0)
 
 
 @server.list_tools()
 async def list_tools() -> list[types.Tool]:
-    try:
-        tools = await _get_tools()
-    except Exception:
-        await _reset()
-        tools = await _get_tools()
-    return [
-        types.Tool(name=t.name, description=t.description or "", inputSchema=t.inputSchema)
-        for t in tools
-    ]
+    return await bridge.list_tools()
 
 
 @server.call_tool()
 async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
-    try:
-        s = await _get_session()
-        res = await s.call_tool(name, arguments or {})
-    except Exception:
-        await _reset()
-        s = await _get_session()
-        res = await s.call_tool(name, arguments or {})
-    out = []
-    for c in res.content:
-        text = c.text if getattr(c, "type", None) == "text" else str(c)
-        out.append(types.TextContent(type="text", text=text))
-    return out
+    return await bridge.call_tool(name, arguments)
