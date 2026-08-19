@@ -4,8 +4,10 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# bun（单二进制，python zipfile 解压，免 unzip）
-RUN curl -fsSL -o /tmp/bun.zip https://github.com/oven-sh/bun/releases/latest/download/bun-linux-x64.zip \
+# bun（slim 没 curl，先 apt 装；单二进制，python zipfile 解压免 unzip）
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl -fsSL -o /tmp/bun.zip https://github.com/oven-sh/bun/releases/latest/download/bun-linux-x64.zip \
     && python3 -m zipfile -e /tmp/bun.zip /opt/bun \
     && chmod +x /opt/bun/bun-linux-x64 \
     && ln -sf /opt/bun/bun-linux-x64 /usr/local/bin/bun \
