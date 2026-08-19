@@ -33,7 +33,7 @@ hub-mcp/
 
 | MCP | SSE 端点 | 工具 |
 |---|---|---|
-| 豆包搜索 | `https://fluidgender159-hub-mcp.hf.space/doubao/sse` | `web_search`（web 搜索，支持站点限定/行业/权威等级等高级参数）/ `web_search_image`（图片搜索） |
+| 豆包搜索 | `https://fluidgender159-hub-mcp.hf.space/doubao/sse` | `web_search_custom`（Custom版，web+image，支持站点限定/行业/权威等级等）/ `web_search_global`（Global版，图文混合，支持 pdf、ICP 限定、短边/宽高比过滤） |
 | 知乎 | `https://fluidgender159-hub-mcp.hf.space/zhihu/sse` | `zhihu_search` / `global_search` / `zhihu_ask` / `zhihu_trending` |
 | DuckDuckGo | `https://fluidgender159-hub-mcp.hf.space/ddg/sse` | `search` / `scrape` |
 
@@ -63,7 +63,8 @@ env 配置了就用 env 值，没配用默认。`GET /` 首页可看各端点鉴
 
 | env | 用途 |
 |---|---|
-| `VOLCENGINE_ARK_API_KEY` | 火山方舟豆包搜索 API key |
+| `VOLCENGINE_ARK_API_KEY` | 火山方舟豆包搜索 Custom 版 API key（必配，Global 版未配时回落用它） |
+| `VOLCENGINE_GLOBAL_API_KEY` | 豆包搜索 Global 版专用 key（可选，去「API Key管理-按量后付费」创建，不配则 Global 版会用 ARK key 并大概率报 700901） |
 | `ZHIHU_ACCESS_SECRET` | 知乎开放平台 Access Secret |
 
 ## 加一个新 MCP
