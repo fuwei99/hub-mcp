@@ -12,6 +12,22 @@ license: mit
 # MCP Hub
 
 一个 HF Space 挂多个 MCP Server，路径区分，各自独立鉴权 key。
+按 local-mcp-hub 的插件玩法重构：**一个 MCP 一个 py**，`main.py` 自动发现装配，加新 MCP 不用改主文件。
+
+## 结构
+
+```
+hub-mcp/
+├── main.py              ← 插件自动发现 + 鉴权壳 + 路由装配
+├── Dockerfile
+├── requirements.txt
+└── mcps/
+    ├── _ddg.py              ← 库：DDG 搜索/抓取实现（下划线开头，不加载为插件）
+    ├── doubao-mcp.py        → /doubao/sse    web_search
+    ├── zhihu-mcp.py         → /zhihu/sse     zhihu_search / global_search / zhihu_ask / zhihu_trending
+    └── ddg-mcp.py           → /ddg/sse       search / scrape
+                              + REST: POST /ddg/search、/ddg/scrape（给 rikkahub 安卓端）
+```
 
 ## 端点
 
@@ -35,37 +51,58 @@ license: mit
 
 每个 MCP 独立 Bearer key（`Authorization: Bearer <key>`）：
 
-| MCP | key | 当前值 |
+| MCP | key env | 默认值 |
 |---|---|---|
-| doubao | `DOUBAO_KEY` env | `wei123..` |
-| zhihu | `ZHIHU_KEY` env | `wei123..` |
-| ddg | `DDG_KEY` env | `wei123..` |
+| doubao | `DOUBAO_KEY` | `wei123..` |
+| zhihu | `ZHIHU_KEY` | `wei123..` |
+| ddg | `DDG_KEY` | `wei123..` |
 
-> key 可通过 Space Secrets 覆盖（同名 env）。
+env 配置了就用 env 值，没配用默认。`GET /` 首页可看各端点鉴权是否配置、上游 secret 有没有就位。
 
-## 上游密钥（Space Settings → Secrets，勿写进仓库）
+## 上游 Secrets（放 HF Space Settings → Secrets，勿写进仓库）
 
-| 名称 | 说明 |
+| env | 用途 |
 |---|---|
 | `ASK_ECHO_SEARCH_INFINITY_API_KEY` | 火山方舟豆包搜索 API key |
 | `ZHIHU_ACCESS_SECRET` | 知乎开放平台 Access Secret |
 
-> DuckDuckGo 不需要任何上游密钥。
+## 加一个新 MCP
 
-## DuckDuckGo 实现备注（`ddg.py`）
+往 `mcps/` 丢个 py，**main.py 不用改**：
 
-逻辑照抄 rikkahub 的 `search/.../DuckDuckGoSearchService.kt`，但有几个服务端特有的坑：
+```python
+"""第一行 docstring 会显示在 / 首页 about 里。"""
+import os
+from mcp import types
+from mcp.server import Server
 
-1. **必须用 `curl_cffi` + `impersonate="chrome131"`**。DDG 现在按 TLS/JA3 指纹拦人，
-   `httpx` / `requests` 无论 header 怎么伪装都是 100% 吃 `202` + 选鸭子 CAPTCHA。
-   安卓端 OkHttp 的指纹天生像浏览器，所以 app 里没这毛病。
-2. **每次请求新连接**。实测复用 `Session` 命中率反而暴跌（第二发就 202）。
-3. `html.duckduckgo.com/html/` 为主，失败时 fallback 到 `lite.duckduckgo.com/lite/`（另一套 table 解析器）。
-4. 全局串行 + 最小间隔 9s + 三轮指数退避。机房 IP 比手机更容易被限流，别高频连打。
+MOUNT = "myname"          # 可选，默认用文件名（去掉 .py）
+KEY_ENV = "MY_KEY"        # 可选，Bearer 鉴权 env 名
+DEFAULT_KEY = ""          # 可选，默认 key（env 没配时用）
+# ENABLED = False         # 可选，临时停用
 
-## 扩展新 MCP
+server = Server("My Server")
 
-照 `hub_server.py` 里的 doubao/zhihu 模板：
-1. 新建一个 `Server("xxx")` + list_tools/call_tool
-2. 加 `SseServerTransport("/xxx/messages/")` + `/xxx/sse` 路由
-3. 中间件里加 `xxx` 的鉴权分支（`XXX_KEY` env）
+
+@server.list_tools()
+async def list_tools() -> list[types.Tool]:
+    ...
+
+
+@server.call_tool()
+async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
+    ...
+```
+
+- **不要**写 `if __name__ == "__main__": server.run(...)`——端口和路由归 hub 管。
+- 一个 py 想挂多个端点：`MOUNTS = {"path1": srv1, "path2": srv2}`。
+- 想带额外 REST 路由（单挂载）：`ROUTES = [starlette.Route("/xxx", endpoint=..., methods=["POST"])]`，会挂在本插件路径下。
+- 想引用同目录库文件：`import _xxx`（下划线开头的文件不会被当插件加载）。
+- 单个插件 import 失败只会在 `/` 的 `broken` 里报错，不影响其他插件。
+
+## 本地跑
+
+```bash
+pip install -r requirements.txt
+uvicorn main:app --port 7860
+```

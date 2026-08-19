@@ -7,8 +7,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY hub_server.py ddg.py ./
+COPY main.py ./
+COPY mcps/ ./mcps/
 
 EXPOSE 7860
 
-CMD ["uvicorn", "hub_server:app", "--host", "0.0.0.0", "--port", "7860"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
