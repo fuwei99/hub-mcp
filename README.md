@@ -35,7 +35,8 @@ hub-mcp/
 |---|---|---|
 | 豆包搜索 | `https://fluidgender159-hub-mcp.hf.space/doubao/sse` | `web_search_custom`（Custom版，web+image，支持站点限定/行业/权威等级等）/ `web_search_global`（Global版，图文混合，支持 pdf、ICP 限定、短边/宽高比过滤） |
 | 知乎 | `https://fluidgender159-hub-mcp.hf.space/zhihu/sse` | `zhihu_search` / `global_search` / `zhihu_ask` / `zhihu_trending` |
-| DuckDuckGo | `https://fluidgender159-hub-mcp.hf.space/ddg/sse` | `search` / `scrape` |
+| DuckDuckGo | `https://fluidgender159-hub-mcp.hf.space/ddg/sse` | `search` / `scrape`（旧版，刮 html，容易被 DDG 反爬卡） |
+| DuckDuckGo(原版TS桥) | `https://fluidgender159-hub-mcp.hf.space/duck/sse` | `ddg_get_answer` / `ddg_search` / `ddg_search_news` / `ddg_search_images` / `ddg_search_videos` / `ddg_fetch_content` / `ddg_get_suggestions` / `ddg_get_definition` / `ddg_convert_currency`（hung319/duck-mcp 原版，bun 子进程桥，VM 挑战解法 + Chrome134 TLS 指纹，抗反爬） |
 
 ### REST 端点（给 rikkahub 安卓端，非 MCP）
 

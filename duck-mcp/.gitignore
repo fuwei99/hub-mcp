@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.tsbuildinfo
+
+# npm
+.npmrc
+
+# Hive framework (local development metadata)
+.hive/
