@@ -1,4 +1,4 @@
-"""DuckDuckGo MCP（原版 TS server 子进程桥）：ddg_get_answer / ddg_search / ddg_search_news / ddg_search_images / ddg_search_videos / ddg_fetch_content / ddg_get_suggestions / ddg_get_definition / ddg_convert_currency。子进程用 node 跑 dist/index.js（Dockerfile 已构建）。"""
+"""学术论文 MCP（academic-mcp 子进程桥）：paper_search / paper_download / paper_read（19+ 学术源，免 key）"""
 import os
 import shlex
 from pathlib import Path
@@ -6,25 +6,22 @@ from pathlib import Path
 from mcp import types
 from mcp.server import Server
 
-MOUNT = "duck"
-KEY_ENV = "DUCK_KEY"
+MOUNT = "academic"
+KEY_ENV = "ACADEMIC_KEY"
 DEFAULT_KEY = "wei123.."
 
-DUCK_DIR = Path(__file__).resolve().parent.parent / "duck-mcp"
-
-server = Server("duck-bridge")
+server = Server("academic-bridge")
 
 _state = {"session": None, "tools": None}
 
 
 async def _spawn():
-    """把原版 TS server（bun 跑的 stdio MCP）拉起来当子进程。"""
+    """把 academic-mcp（独立 venv 里的 stdio MCP）拉起来当子进程。"""
     from mcp import ClientSession
     from mcp.client.stdio import stdio_client
 
-    cmd = os.environ.get("DUCK_MCP_CMD", "bash")
-    args = ["-c", f"cd {shlex.quote(str(DUCK_DIR))} && exec node dist/index.js"]
-    read, write, _ = await stdio_client(cmd, args, env=dict(os.environ))
+    cmd = os.environ.get("ACADEMIC_MCP_CMD", "/opt/academic-venv/bin/academic-mcp")
+    read, write, _ = await stdio_client(cmd, [], env=dict(os.environ))
     session = ClientSession(read, write)
     await session.initialize()
     return session
