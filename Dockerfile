@@ -7,4 +7,5 @@ EXPOSE 7860
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
 
-# rebuild trigger: 491197b (academic mcp<2.0 fix)
+
+# rebuild trigger: 2c28ea7 (bridge ClientSession __aenter__ fix)
