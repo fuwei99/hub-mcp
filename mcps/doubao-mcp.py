@@ -1,4 +1,4 @@
-"""豆包联网搜索 (web_search)。上游 key: ASK_ECHO_SEARCH_INFINITY_API_KEY"""
+"""豆包联网搜索 (web_search)。上游 key: VOLCENGINE_ARK_API_KEY"""
 import json
 import os
 
@@ -10,9 +10,9 @@ from mcp.server import Server
 MOUNT = "doubao"
 KEY_ENV = "DOUBAO_KEY"
 DEFAULT_KEY = "wei123.."
-SECRETS = {"ark": "ASK_ECHO_SEARCH_INFINITY_API_KEY"}
+SECRETS = {"ark": "VOLCENGINE_ARK_API_KEY"}
 
-ARK_KEY = os.environ.get("ASK_ECHO_SEARCH_INFINITY_API_KEY", "").strip()
+ARK_KEY = os.environ.get("VOLCENGINE_ARK_API_KEY", "").strip()
 DOUBAO_HOST = "https://open.feedcoopapi.com/search_api/web_search"
 
 server = Server("doubao-search")
@@ -35,7 +35,7 @@ def bound_doubao_result(data: dict) -> dict:
 
 async def doubao_web_search(query: str, count: int) -> dict:
     if not ARK_KEY:
-        raise HTTPException(500, "服务端未配置 ASK_ECHO_SEARCH_INFINITY_API_KEY")
+        raise HTTPException(500, "服务端未配置 VOLCENGINE_ARK_API_KEY")
     async with httpx.AsyncClient(timeout=120) as client:
         r = await client.post(
             DOUBAO_HOST,

@@ -63,7 +63,7 @@ env 配置了就用 env 值，没配用默认。`GET /` 首页可看各端点鉴
 
 | env | 用途 |
 |---|---|
-| `ASK_ECHO_SEARCH_INFINITY_API_KEY` | 火山方舟豆包搜索 API key |
+| `VOLCENGINE_ARK_API_KEY` | 火山方舟豆包搜索 API key |
 | `ZHIHU_ACCESS_SECRET` | 知乎开放平台 Access Secret |
 
 ## 加一个新 MCP
