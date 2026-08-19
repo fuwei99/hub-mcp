@@ -15,15 +15,31 @@ server = Server("academic-bridge")
 _state = {"session": None, "tools": None}
 
 
+async def _spawn_stdio(cmd: str, args: list[str]):
+    """跨 mcp 版本拉起 stdio 子进程：
+    - mcp 1.2.0: stdio_client(server: StdioServerParameters)（单参数，env 默认白名单继承）
+    - mcp 1.29+: stdio_client(command, args=...)
+    """
+    import inspect
+
+    from mcp.client.stdio import stdio_client
+
+    params = inspect.signature(stdio_client).parameters
+    if "server" in params:
+        from mcp.client.stdio import StdioServerParameters
+
+        streams = await stdio_client(StdioServerParameters(command=cmd, args=args))
+    else:
+        streams = await stdio_client(cmd, args=args)
+    return streams[0], streams[1]  # 兼容 2 元组/3 元组返回
+
+
 async def _spawn():
     """把 academic-mcp（独立 venv 里的 stdio MCP）拉起来当子进程。"""
     from mcp import ClientSession
-    from mcp.client.stdio import stdio_client
 
     cmd = os.environ.get("ACADEMIC_MCP_CMD", "/opt/academic-venv/bin/academic-mcp")
-    # 兼容 mcp==1.2.0（无 env 参数、返回 2 元组）与新版；子进程默认继承父进程环境
-    streams = await stdio_client(cmd, [])
-    read, write = streams[0], streams[1]
+    read, write = await _spawn_stdio(cmd, [])
     session = ClientSession(read, write)
     await session.initialize()
     return session
