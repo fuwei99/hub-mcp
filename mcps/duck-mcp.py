@@ -24,7 +24,9 @@ async def _spawn():
 
     cmd = os.environ.get("DUCK_MCP_CMD", "bash")
     args = ["-c", f"cd {shlex.quote(str(DUCK_DIR))} && exec node dist/index.js"]
-    read, write, _ = await stdio_client(cmd, args, env=dict(os.environ))
+    # 兼容 mcp==1.2.0（无 env 参数、返回 2 元组）与新版；子进程默认继承父进程环境
+    streams = await stdio_client(cmd, args)
+    read, write = streams[0], streams[1]
     session = ClientSession(read, write)
     await session.initialize()
     return session

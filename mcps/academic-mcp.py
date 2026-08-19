@@ -21,7 +21,9 @@ async def _spawn():
     from mcp.client.stdio import stdio_client
 
     cmd = os.environ.get("ACADEMIC_MCP_CMD", "/opt/academic-venv/bin/academic-mcp")
-    read, write, _ = await stdio_client(cmd, [], env=dict(os.environ))
+    # 兼容 mcp==1.2.0（无 env 参数、返回 2 元组）与新版；子进程默认继承父进程环境
+    streams = await stdio_client(cmd, [])
+    read, write = streams[0], streams[1]
     session = ClientSession(read, write)
     await session.initialize()
     return session
