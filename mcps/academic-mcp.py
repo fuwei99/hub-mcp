@@ -1,6 +1,6 @@
 """学术论文 MCP（academic-mcp 子进程桥）：paper_search / paper_download / paper_read（19+ 学术源，免 key）"""
+import asyncio
 import os
-import shlex
 from pathlib import Path
 
 from mcp import types
@@ -12,54 +12,56 @@ DEFAULT_KEY = "wei123.."
 
 server = Server("academic-bridge")
 
-_state = {"session": None, "tools": None}
+_state = {"session": None, "tools": None, "cm": None, "lock": None}
 
 
-async def _spawn_stdio(cmd: str, args: list[str]):
-    """跨 mcp 版本拉起 stdio 子进程：
-    - mcp 1.2.0: stdio_client(server: StdioServerParameters)（单参数，env 默认白名单继承）
-    - mcp 1.29+: stdio_client(command, args=...)
-    """
-    import inspect
-
-    from mcp.client.stdio import stdio_client
-
-    params = inspect.signature(stdio_client).parameters
-    if "server" in params:
-        from mcp.client.stdio import StdioServerParameters
-
-        streams = await stdio_client(StdioServerParameters(command=cmd, args=args))
-    else:
-        streams = await stdio_client(cmd, args=args)
-    return streams[0], streams[1]  # 兼容 2 元组/3 元组返回
+def _get_lock():
+    if _state["lock"] is None:
+        _state["lock"] = asyncio.Lock()
+    return _state["lock"]
 
 
 async def _spawn():
-    """把 academic-mcp（独立 venv 里的 stdio MCP）拉起来当子进程。"""
     from mcp import ClientSession
+    from mcp.client.stdio import StdioServerParameters, stdio_client
 
     cmd = os.environ.get("ACADEMIC_MCP_CMD", "/opt/academic-venv/bin/academic-mcp")
-    read, write = await _spawn_stdio(cmd, [])
+    params = StdioServerParameters(command=cmd, args=[])
+    cm = stdio_client(params)
+    read, write = await cm.__aenter__()
     session = ClientSession(read, write)
     await session.initialize()
+    _state["cm"] = cm
+    _state["session"] = session
     return session
 
 
 async def _get_session():
-    if _state["session"] is None:
-        _state["session"] = await _spawn()
-    return _state["session"]
+    lock = _get_lock()
+    async with lock:
+        if _state["session"] is None:
+            await _spawn()
+        return _state["session"]
 
 
 async def _reset():
-    s = _state["session"]
-    if s is not None:
-        try:
-            await s.aclose()
-        except Exception:
-            pass
-    _state["session"] = None
-    _state["tools"] = None
+    lock = _get_lock()
+    async with lock:
+        s = _state["session"]
+        cm = _state["cm"]
+        _state["session"] = None
+        _state["tools"] = None
+        _state["cm"] = None
+        if s is not None:
+            try:
+                await s.aclose()
+            except Exception:
+                pass
+        if cm is not None:
+            try:
+                await cm.__aexit__(None, None, None)
+            except Exception:
+                pass
 
 
 async def _get_tools():
