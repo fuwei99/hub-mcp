@@ -7,5 +7,4 @@ EXPOSE 7860
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
 
-
-# rebuild trigger: 2c28ea7 (bridge ClientSession __aenter__ fix)
+# rebuild trigger: 5a0e022 (bridge per-call session, fixes cross-task deadlock)
