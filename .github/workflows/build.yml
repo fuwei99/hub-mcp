@@ -15,6 +15,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 防呆：HF 版 Dockerfile（FROM ghcr.io/fuwei99/hub-mcp）若被同步回来会导致「套娃构建」
+      # —— 从上一版镜像原地转手重推，COPY 全不执行，镜像永远旧代码却显示 success。已栽两次。
+      - name: 拒绝套娃构建
+        run: |
+          if grep -qE '^FROM +ghcr\.io/fuwei99/hub-mcp' Dockerfile; then
+            echo "::error::Dockerfile 是 HF 版（FROM ghcr.io/fuwei99/hub-mcp），会套娃构建。请恢复完整构建版。"
+            exit 1
+          fi
+          grep -q 'COPY mcps/' Dockerfile || { echo "::error::Dockerfile 缺少 COPY mcps/"; exit 1; }
+          echo "Dockerfile 检查通过（完整构建版）"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
