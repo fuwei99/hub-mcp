@@ -15,7 +15,7 @@ DUCK_DIR = Path(__file__).resolve().parent.parent / "duck-mcp"
 
 server = Server("duck-bridge")
 
-_state = {"session": None, "tools": None, "cm": None, "lock": None}
+_state = {"session": None, "session_cm": None, "tools": None, "cm": None, "lock": None}
 
 
 def _get_lock():
@@ -33,8 +33,10 @@ async def _spawn():
     params = StdioServerParameters(command=cmd, args=args)
     cm = stdio_client(params)
     read, write = await cm.__aenter__()
-    session = ClientSession(read, write)
-    await session.initialize()
+    session_cm = ClientSession(read, write)
+    session = await session_cm.__aenter__()
+    await asyncio.wait_for(session.initialize(), timeout=60)
+    _state["session_cm"] = session_cm
     _state["cm"] = cm
     _state["session"] = session
     return session
@@ -51,14 +53,15 @@ async def _get_session():
 async def _reset():
     lock = _get_lock()
     async with lock:
-        s = _state["session"]
+        scm = _state["session_cm"]
         cm = _state["cm"]
         _state["session"] = None
+        _state["session_cm"] = None
         _state["tools"] = None
         _state["cm"] = None
-        if s is not None:
+        if scm is not None:
             try:
-                await s.aclose()
+                await scm.__aexit__(None, None, None)
             except Exception:
                 pass
         if cm is not None:
