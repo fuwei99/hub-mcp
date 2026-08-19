@@ -33,7 +33,7 @@ hub-mcp/
 
 | MCP | SSE 端点 | 工具 |
 |---|---|---|
-| 豆包搜索 | `https://fluidgender159-hub-mcp.hf.space/doubao/sse` | `web_search` |
+| 豆包搜索 | `https://fluidgender159-hub-mcp.hf.space/doubao/sse` | `web_search`（web 搜索，支持站点限定/行业/权威等级等高级参数）/ `web_search_image`（图片搜索） |
 | 知乎 | `https://fluidgender159-hub-mcp.hf.space/zhihu/sse` | `zhihu_search` / `global_search` / `zhihu_ask` / `zhihu_trending` |
 | DuckDuckGo | `https://fluidgender159-hub-mcp.hf.space/ddg/sse` | `search` / `scrape` |
 
