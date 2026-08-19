@@ -24,6 +24,10 @@ COPY duck-mcp/ ./duck-mcp/
 # 装 duck-mcp（TS 原版）依赖并构建出 dist/
 RUN cd duck-mcp && npm install && npm run build
 
+# academic-mcp（独立 venv 隔离依赖，避免 fastmcp 与 hub 的 mcp==1.2.0 冲突；stdio 子进程桥用）
+RUN python3 -m venv /opt/academic-venv \
+    && /opt/academic-venv/bin/pip install --no-cache-dir academic-mcp==0.1.7
+
 EXPOSE 7860
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
